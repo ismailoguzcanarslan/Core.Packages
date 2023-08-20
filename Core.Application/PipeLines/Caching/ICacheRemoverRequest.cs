@@ -8,6 +8,7 @@ namespace Core.Application.PipeLines.Caching;
 
 public interface ICacheRemoverRequest
 {
-    string CacheKey { get; }
+    string? CacheKey { get; }
     bool ByPassCache { get; }
+    string? CacheGroupKey { get; }
 }

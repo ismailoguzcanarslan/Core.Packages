@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Core.Application.PipeLines.Caching;
@@ -28,11 +29,26 @@ public class CacheRemovingBehavior<TRequest, TResponse> : IPipelineBehavior<TReq
 
         TResponse response = await next();
 
-        if (string.IsNullOrEmpty(request.CacheKey))
+        if (request.CacheGroupKey != null)
         {
-            await _cache.RemoveAsync(request.CacheKey);
+            byte[]? cachedGroup = await _cache.GetAsync(request.CacheGroupKey, cancellationToken);
+            if (cachedGroup != null)
+            {
+                HashSet<string> keysInGroup = JsonSerializer.Deserialize<HashSet<string>>(Encoding.Default.GetString(cachedGroup))!;
+                foreach (string key in keysInGroup)
+                {
+                    await _cache.RemoveAsync(key, cancellationToken);
+                }
+
+                await _cache.RemoveAsync(request.CacheGroupKey, cancellationToken);
+                await _cache.RemoveAsync(key: $"{request.CacheGroupKey}SlidingExpiration", cancellationToken);
+            }
         }
 
+        if (request.CacheKey != null)
+        {
+            await _cache.RemoveAsync(request.CacheKey, cancellationToken);
+        }
         return response;
     }
 }
